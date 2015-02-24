@@ -1,0 +1,9 @@
+{
+	"name": "pr2-rop",
+	"version": "0.0.1",
+	"description": "PR2 Remote Operations Portal",
+	"dependencies": {
+		"express": "4.x"
+	}
+}
+
