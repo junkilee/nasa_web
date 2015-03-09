@@ -4,15 +4,23 @@
 <meta charset="utf-8" />
 
 <script src="http://cdn.robotwebtools.org/threejs/current/three.min.js"></script>
-<script src="http://cdn.robotwebtools.org/ColladaAnimationCompress/current/ColladaLoader2.min.js"></script>
+<!-- <script src="http://cdn.robotwebtools.org/ColladaAnimationCompress/current/ColladaLoader2.js"></script> -->
+<script src="http://cdn.robotwebtools.org/threejs/current/STLLoader.min.js"></script>
+<script src="http://cdn.robotwebtools.org/threejs/current/ColladaLoader.min.js"></script>
 <script src="http://cdn.robotwebtools.org/EventEmitter2/current/eventemitter2.min.js"></script>
-<script src="http://cdn.robotwebtools.org/roslibjs/current/roslib.min.js"></script>
-<script src="http://cdn.robotwebtools.org/ros3djs/current/ros3d.min.js"></script>
+<script src="http://cdn.robotwebtools.org/roslibjs/current/roslib.js"></script>
+<!-- <script src="http://cdn.robotwebtools.org/ros3djs/0.10.0/ros3d.js"></script> -->
+<!-- <script src="http://cdn.robotwebtools.org/ros3djs/current/ros3d.js"></script> -->
+<script src="js/ros3d.0.13.0.js"></script>
 <script src="js/config.js"></script>
+<script src="js/affordance.js"></script>
 <script>
   /**
    * Setup all visualization elements when the page is loaded.
    */
+  var service1;
+  var service2;
+
   function init() {
     // Connect to ROS.
     var ros = new ROSLIB.Ros({
@@ -22,8 +30,11 @@
     // Create the main viewer.
     var viewer = new ROS3D.Viewer({
       divID : 'urdf',
-      width : 800,
+      width : 1200,
       height : 600,
+		/*
+      width : window.innerWidth,
+      height : window.innerHeight, */
       antialias : true
     });
 
@@ -40,19 +51,68 @@
     });
 
     // Setup the URDF client.
+	/*
     var urdfClient = new ROS3D.UrdfClient({
       ros : ros,
       tfClient : tfClient,
       rootObject : viewer.scene,
+      path : MESH_URL,
+	  loader :  ROS3D.COLLADA_LOADER
+    }); */
+	/*
+	  loader :  ROS3D.COLLADA_LOADER
+	*/
+
+    var imClient = new ROS3D.InteractiveMarkerClient({
+      ros : ros,
+      tfClient : tfClient,
+      topic : '/affordance_template_server',
+      camera : viewer.camera,
+      rootObject : viewer.selectableObjects,
+	  loader :  ROS3D.COLLADA_LOADER,
       path : MESH_URL
     });
+   
+	/*
+	var markerClient = new ROS3D.MarkerArrayClient({
+      ros : ros,
+      tfClient : tfClient,
+      topic : '/pr2/move_group/planned_path_visualization',
+      rootObject : viewer.scene,
+      path : MESH_URL
+    }); */
 
+    make_buttons();
+	var listener = new ROSLIB.Topic({
+		ros : ros,
+		name : '/affordances',
+		messageType : 'affordance_ros_control/AffordanceList'
+	});
 
-  }
+	listener.subscribe(function(message) {
+		console.log('Received message on ' + listener.name);
+		populate_affordances('affordance_list', message.affordances);
+	});
+
+	service1 = new ROSLIB.Service({
+		ros : ros,
+		name : '/change_affordance',
+		serviceType : 'affordance_ros_control/ChangeAffordance'
+	});
+	service2 = new ROSLIB.Service({
+		ros : ros,
+		name : '/affordance_cmd',
+		serviceType : 'affordance_ros_control/AffordanceCommand'
+	});
+	}
 </script>
 </head>
 
 <body onload="init()">
   <div id="urdf"></div>
+  <div id="affordance_list"></div>
+  <div id="controls"></div>
+  <div id="ee_box"></div>
+  <div id="options"><label for="steps">Steps:</label><input id="steps" size="2" value="1"/><label for="execute">Execute on Plan</label><input id="execute" type="checkbox"/>
 </body>
 </html>

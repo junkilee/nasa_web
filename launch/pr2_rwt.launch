@@ -1,8 +1,18 @@
 <launch>
-    <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
-    </include>
-    <node name="tf2_web_republisher" pkg="tf2_web_republisher" type="tf2_web_republisher" output="screen"/>		     
+	<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+	</include>
+	<node name="tf2_web_republisher" pkg="tf2_web_republisher" type="tf2_web_republisher" output="screen"/>		     
+		 
+	<node name="interactive_marker_proxy" pkg="interactive_marker_proxy" type="proxy" output="screen">
+		<remap from="topic_ns" to="/pr2_teleop" />
+		<remap from="target_frame" to="odom_combined" />
+	</node>
 
+	<node name="interactive_marker_proxy2" pkg="interactive_marker_proxy" 
+	type="proxy" output="screen">
+		<remap from="topic_ns" to="/affordance_template_server" />
+		<remap from="target_frame" to="odom_combined" />
+	</node>
 
-
+	<node name="aros_control" pkg="affordance_ros_control" type="ros_control.py" />
 </launch>
