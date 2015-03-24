@@ -1,3 +1,3 @@
-var IP = 'localhost';
-var MESH_URL = 'http://localhost:8080/';
+var IP = '54.84.194.111';
+var MESH_URL = 'http://54.84.194.111:8080/';
 //var MESH_URL = 'http://resources.robotwebtools.org/';

@@ -2,28 +2,30 @@
 <html>
 <head>
 <meta charset="utf-8" />
-
-<script src="http://cdn.robotwebtools.org/threejs/current/three.min.js"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.3/themes/smoothness/jquery-ui.css" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.3/jquery-ui.min.js"></script>
+<script src="http://cdn.robotwebtools.org/threejs/current/three.js"></script>
 <!-- <script src="http://cdn.robotwebtools.org/ColladaAnimationCompress/current/ColladaLoader2.js"></script> -->
 <script src="http://cdn.robotwebtools.org/threejs/current/STLLoader.min.js"></script>
 <script src="http://cdn.robotwebtools.org/threejs/current/ColladaLoader.min.js"></script>
 <script src="http://cdn.robotwebtools.org/EventEmitter2/current/eventemitter2.min.js"></script>
-<script src="http://cdn.robotwebtools.org/roslibjs/current/roslib.js"></script>
-<!-- <script src="http://cdn.robotwebtools.org/ros3djs/0.10.0/ros3d.js"></script> -->
-<!-- <script src="http://cdn.robotwebtools.org/ros3djs/current/ros3d.js"></script> -->
-<script src="js/ros3d.0.13.0.js"></script>
+<script src="js/bson.js"></script>
+<script src="js/roslib.js"></script>
+<script src="http://cdn.robotwebtools.org/ros3djs/current/ros3d.js"></script>
 <script src="js/config.js"></script>
-<script src="js/affordance.js"></script>
+<script src="js/DepthCloudBson.js"></script>
 <script>
   /**
    * Setup all visualization elements when the page is loaded.
    */
-  var service1;
-  var service2;
+  var ros;
+	var robot = null;
+	var templates = null;
 
   function init() {
     // Connect to ROS.
-    var ros = new ROSLIB.Ros({
+    ros = new ROSLIB.Ros({
       url : 'ws://' + IP + ':9090'
     });
 
@@ -51,14 +53,13 @@
     });
 
     // Setup the URDF client.
-	/*
     var urdfClient = new ROS3D.UrdfClient({
       ros : ros,
       tfClient : tfClient,
       rootObject : viewer.scene,
       path : MESH_URL,
 	  loader :  ROS3D.COLLADA_LOADER
-    }); */
+    });
 	/*
 	  loader :  ROS3D.COLLADA_LOADER
 	*/
@@ -82,37 +83,127 @@
       path : MESH_URL
     }); */
 
-    make_buttons();
-	var listener = new ROSLIB.Topic({
+	pc_subscriber = new ROSLIB.Topic({   
+		ros: ros,
+        name: '/head_mount_kinect/depth_registered/points',
+        messageType: 'sensor_msgs/PointCloud2',
+        queue_length: 1,
+        throttle_rate: 1000/15 | 0
+    }); 
+
+
+	var depth_cloud = new ROS3D.DepthCloudBson({
+      pc_subscriber : pc_subscriber,
+    });
+
+	var kinect_node = new ROS3D.SceneNode({
+      frameID : '/head_mount_kinect_ir_optical_frame',
+      tfClient : tfClient,
+      object : depth_cloud
+    });
+
+    viewer.scene.add(kinect_node);
+
+	get_running_client_ = new ROSLIB.Service({
 		ros : ros,
-		name : '/affordances',
-		messageType : 'affordance_ros_control/AffordanceList'
+		name : '/affordance_template_server/get_running',
+		serviceType : 'affordance_template_msgs/GetRunningAffordanceTemplates',
 	});
 
-	listener.subscribe(function(message) {
-		console.log('Received message on ' + listener.name);
-		populate_affordances('affordance_list', message.affordances);
+	get_robots_client_ = new ROSLIB.Service({
+		ros : ros,
+		name : '/affordance_template_server/get_robots',
+		serviceType : 'affordance_template_msgs/GetRobotConfigInfo',
 	});
 
-	service1 = new ROSLIB.Service({
+	command_client_ = new ROSLIB.Service({
 		ros : ros,
-		name : '/change_affordance',
-		serviceType : 'affordance_ros_control/ChangeAffordance'
+		name : '/affordance_template_server/command',
+		serviceType : 'affordance_template_msgs/AffordanceTemplateCommand',
 	});
-	service2 = new ROSLIB.Service({
-		ros : ros,
-		name : '/affordance_cmd',
-		serviceType : 'affordance_ros_control/AffordanceCommand'
+
+  var request = new ROSLIB.ServiceRequest({});
+
+	get_running_client_.callService(request, function(result) {
+		$("#running_templates").html("");
+		for (idx in result.templates) {
+			$("#running_templates").append("<p>" + result.templates[idx] + "</p>");
+    }
+		templates = result.templates;
 	});
+  
+	var request = new ROSLIB.ServiceRequest({});
+	get_robots_client_.callService(request, function(result) {
+		$("#robots").html("");
+		for (idx in result.robots) {
+			$("#robots").append("<p>" + result.robots[idx].name + "</p>");
+			robot = result.robots[idx];
+
+			$("#ee_box tbody").empty();
+			for (idx2 in result.robots[idx].end_effectors) {
+				$("#ee_box tbody").append("<tr>" + 
+					"<td>" + result.robots[idx].end_effectors[idx2].name + "</td>" +
+					"<td align='center'>-</td>" +
+					"<td align='center'>-</td>" +
+					"</tr>");
+			}
+    }
+	});
+
+	//var buttons = {"start":"GO_TO_START", "rwnd":"STEP_BACKWARD", "ffwd":"STEP_FORWARD", "end": "GO_TO_END"};
+	var buttons = {"start":0, "rwnd":4, "ffwd":5, "end": 1};
+	for (key in buttons) {
+		$("#controls").append("<img id='" + key + "' src='resources/" + key + ".png' width='50px'>");
+		$("#" + key).click(function() {
+			k = $(this).attr('id');
+			var request = new ROSLIB.ServiceRequest({});
+			request.type = templates[0].split(":")[0];
+			request.id = parseInt(templates[0].split(":")[1]);
+			request.command = buttons[k];
+			request.steps = parseInt($('#steps').val());
+			request.execute_on_plan = $('#execute').is(':checked');
+			request.execute_precomputed_plan = false;
+			request.end_effectors = [];
+			for (i in robot.end_effectors) {
+				request.end_effectors.push(robot.end_effectors[i].name);
+			}
+			command_client_.callService(request, function(result) {
+				console.log(result);
+				for (idx in result.waypoint_info) {
+					i = parseInt(idx);
+					$("#ee_box tbody > tr > td")[i * 3 + 1].innerHTML = result.waypoint_info[i].waypoint_index;
+					$("#ee_box tbody > tr > td")[i * 3 + 2].innerHTML = result.waypoint_info[i].num_waypoints;
+				}
+			});
+		});
 	}
+
+}
 </script>
 </head>
 
 <body onload="init()">
   <div id="urdf"></div>
-  <div id="affordance_list"></div>
-  <div id="controls"></div>
-  <div id="ee_box"></div>
-  <div id="options"><label for="steps">Steps:</label><input id="steps" size="2" value="1"/><label for="execute">Execute on Plan</label><input id="execute" type="checkbox"/>
+  <div id="running_templates">
+	</div>
+  <div id="controls">
+	</div>
+  <table id="ee_box">
+		<thead>
+			<th width="100pt">name</th>
+			<th width="60pt">@wp</th>
+			<th width="60pt">#wps</th>
+		</thead>
+		<tbody>
+		</tbody>
+	</table>
+  <div id="options">
+		<label for="steps">Steps:</label>
+		<input id="steps" size="2" value="1"/>
+		<label for="execute">Execute on Plan</label>
+		<input id="execute" type="checkbox"/>
+	</div>
+  <div id="robots">
+	</div>
 </body>
 </html>

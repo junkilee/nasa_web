@@ -14,5 +14,5 @@
 		<remap from="target_frame" to="odom_combined" />
 	</node>
 
-	<node name="aros_control" pkg="affordance_ros_control" type="ros_control.py" />
+	<!-- <node name="aros_control" pkg="affordance_ros_control" type="ros_control.py" /> -->
 </launch>

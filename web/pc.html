@@ -6,7 +6,8 @@
 <script src="http://cdn.robotwebtools.org/threejs/current/three.min.js"></script>
 <script src="http://cdn.robotwebtools.org/ColladaAnimationCompress/current/ColladaLoader2.min.js"></script>
 <script src="http://cdn.robotwebtools.org/EventEmitter2/current/eventemitter2.min.js"></script>
-<script src="http://cdn.robotwebtools.org/roslibjs/current/roslib.min.js"></script>
+<script src="js/bson.js"></script>
+<script src="js/roslib.js"></script>
 <script src="http://cdn.robotwebtools.org/ros3djs/current/ros3d.min.js"></script>
 <script src="js/config.js"></script>
 
@@ -23,7 +24,7 @@
     // Create the main viewer.
     var viewer = new ROS3D.Viewer({
       divID : 'urdf',
-      width : 800,
+      width : 1200,
       height : 600,
       antialias : true
     });
@@ -37,7 +38,7 @@
       angularThres : 0.01,
       transThres : 0.01,
       rate : 10.0,
-      fixedFrame : '/world'
+      fixedFrame : '/base_link'
     });
 
     // Setup Kinect DepthCloud stream
@@ -49,7 +50,7 @@
 
     // Create Kinect scene node
     var kinectNode = new ROS3D.SceneNode({
-      frameID : '/r2/simulated_asus_depth_frame',
+      frameID : '/head_mount_kinect_ir_optical_frame',
       tfClient : tfClient,
       object : depthCloud
     });
